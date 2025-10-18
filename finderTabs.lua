@@ -114,9 +114,9 @@ function _InitializeTabs()
       wideScreenOnly   = false,
     }, 
     {
-      title            = "M Documents",
+      title            = "M_Documents",
       winFrame         = { h = displayHeight, w = 840.0, x = FT_MainScreenFrame.w-840.0*2, y = 0.0 },
-      path             = dropboxHome.."M Documents",
+      path             = dropboxHome.."M_Documents",
       sidebarIsVisible = false,
       toolbarIsVisible = false,
       wideScreenOnly   = false,
@@ -466,4 +466,3 @@ end
 print("** Loaded finderTabs **")
 
 ---
-
