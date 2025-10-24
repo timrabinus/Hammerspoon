@@ -39,6 +39,38 @@ MK_CommonKeys = {
   ["Move Window to the Right Side of the Screen"]="}",
 }
 
+function buildWindowMenuItems()
+  app = hs.application.frontmostApplication()
+  if not app then return nil end
+
+  local windows = app:allWindows()
+  local minimizedWindows = select(hs.window.minimizedWindows(), 
+    function(win) return app == win:application() end)
+  windows = addAll(windows, minimizedWindows)
+  table.sort(windows, function(a,b) return a:title() < b:title() end)
+
+  -- windows = app.allWindows() + hs.window.minimizedWindows().select { w | w:application() == app }
+  -- windows = windows.sort { a, b | a.title() < b.title() }
+
+  local windowItems = {}
+  local index = 1
+
+  for _, window in ipairs(windows) do
+    print(window)
+    local title = window:title()
+    if window:isStandard() and title ~= nil and title ~= "" then
+      table.insert(windowItems, {
+          title="        "..index..":  "..title,
+          fn=function(cmd,item) print(title) end,
+          shortcut=""..index})
+      index = index + 1
+    end
+  end
+  return windowItems
+end
+
+
+
 -- [] Fix duplicate "Save As…" (same key) and "Close Window" (diff keys)
 
 -- Find keys that are common, like Save etc
@@ -163,6 +195,7 @@ function getMenuKeysMenu(menu, isAppMenu)
   local commonShortcuts = {}
   local lastTitle
   local cpad = ""
+  local appendWindows = false
   -- pad = pad or 0
 
   -- start by finding & assigning common menu items, like Save, Print
@@ -194,6 +227,9 @@ function getMenuKeysMenu(menu, isAppMenu)
       end
       lastItemWasSeparator = true
 
+    elseif title == "Help" then
+      -- skip help menu; windows will be placed after this if available
+
     else
       lastItemWasSeparator = false
       local children = item["AXChildren"]
@@ -212,7 +248,6 @@ function getMenuKeysMenu(menu, isAppMenu)
       end
 
       if children then
-
         -- handle app menu 
         -- local isAppMenu = (pad == 0 and m == 1)
         if isAppMenu and m == 1 then
@@ -223,6 +258,11 @@ function getMenuKeysMenu(menu, isAppMenu)
         else
           -- newTitle = cpad..newTitle
           newTitle = hs.styledtext.new(cpad)..newTitle
+        end
+
+        if title == 'Window' then
+          table.insert(popupMenu, { title = "-" })
+          appendWindows = true
         end
 
         -- local submenu = getMenuKeysMenu(children[1], pad)
@@ -256,6 +296,16 @@ function getMenuKeysMenu(menu, isAppMenu)
 
       else
         -- dump(item, "title should not be nil")
+      end
+    end
+  end
+
+  if appendWindows then
+    windowItems = buildWindowMenuItems()
+    if windowItems and #windowItems > 0 then
+      -- table.insert(popupMenu, { title = "-" })
+      for w = 1, #windowItems do
+        table.insert(popupMenu, windowItems[w])
       end
     end
   end
