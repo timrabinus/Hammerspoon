@@ -13,34 +13,6 @@ ES_Brightness = hs.screen.primaryScreen(): getBrightness() or 0.5
 ES_TimeFormat = "%I:%M:%S %p"
 
 ES_UsePopupMenu = false
-ES_ResolutionShortcutKeys = {"9", "8", "7", "6", "5", "4", "3", "2", "1"}
-ES_ResolutionShortcuts = {}
-ES_ResolutionHotkeys = {}
-
--- ES_OnIcon    = 1
--- ES_OffIcon   = 2
--- ES_TimerIcons = {
---   [1]  = {"􀀺","􀀻"},
---   [2]  = {"􀀼","􀀽"},
---   [3]  = {"􀀾","􀀿"},
---   [4]  = {"􀁀","􀁁"},
---   [5]  = {"􀁂","􀁃"},
---   [6]  = {"􀁄","􀁅"},
---   [7]  = {"􀁆","􀁇"},
---   [8]  = {"􀁈","􀁉"},
---   [9]  = {"􀁊","􀁋"},
---   [10] = {"􀓵","􀔔"},
---   [15] = {"􀓺","􀔙"},
---   [20] = {"􀓿","􀔞"},
---   [25] = {"􀔄","􀔣"},
---   [30] = {"􀔉","􀔨"},
---   [35] = {"􀚝","􀚞"},
---   [40] = {"􀚧","􀚨"},
---   [45] = {"􀚱","􀚲"},
---   [50] = {"􀚻","􀚼"},
--- }
--- keys: timer, mins, startTime
-ES_Timers = {}
 
 
 --
@@ -134,90 +106,6 @@ function setResolution(uuid, w, h, scale, frequency, depth)
   end
 end
 
--- # Timers
-
--- function removeTimer(timer)
---   timer:stop()
---   local index
---   for t,v in pairs(ES_Timers) do
---     if v.timer == timer then index = t end
---   end
---   if index then
---     table.remove(ES_Timers, index)
---   end
--- end
-
-
--- function timerEndAction(label, timerInfo)
---   if label == "OK" then 
---     removeTimer(timerInfo.timer)
---   else
---     log("Timer repeated")
---     timerInfo.timer:start()
---     timerInfo.repeatTime = os.time()
---     timerInfo.endTime    = timerInfo.repeatTime+timerInfo.mins*60
---     timerInfo.isEnded    = false
---     table.sort(ES_Timers, function(a,b) return a.endTime < b.endTime end)
---   end
--- end
-
-
--- function timerEditAction(label, timerInfo)
---   if label == "Stop" then 
---     removeTimer(timerInfo.timer)
---   end
--- end
-
-
--- function timerEnded(timerInfo)
---   timerInfo.timer:stop()
---   timerInfo.isEnded = true
---   hs.sound.getByName("Blow"):volume(1):play()
---   local frame = hs.screen.mainScreen():frame()
---   local x,y = frame.x+frame.w//2, frame.y+frame.h//3
---   -- x,y = 100,100
---   hs.dialog.alert(
---     x,y, 
---     function(label) timerEndAction(label, timerInfo) end, 
---     "Timer Finished", 
---     "Your "..timerInfo.mins.." minute timer completed", 
---     "OK", "Repeat",
---     "informational")
--- end
-
-
--- function showTimer(timerInfo)
---   local frame = hs.screen.mainScreen():frame()
---   local x,y = frame.x+frame.w//2, frame.y+frame.h//3
---   local repeatPrompt = ""
---   -- x,y = 100,100
---   if timerInfo.repeatTime then 
---     repeatPrompt = "\nRestarted at "..os.date(ES_TimeFormat,timerInfo.repeatTime)
---   end
-
---   hs.dialog.alert(
---     x,y, 
---     function(label) timerEditAction(label, timerInfo) end, 
---     timerInfo.mins.." Minute Timer", 
---     "Timer originally started at "..os.date(ES_TimeFormat,timerInfo.startTime)..repeatPrompt,
---     "OK", "Stop",
---     "informational")
--- end
-
-
--- function addTimer(mins)
---   local now=os.time()
---   local endTime=now+mins*60
---   log("Started "..mins.." minute timer at "..os.date(ES_TimeFormat,now)..". Will finish: "..os.date(ES_TimeFormat,endTime))
---   local timer, timerInfo
---   timerInfo = {mins=mins, startTime=now, endTime=endTime, isEnded=false }
---   timerInfo.timer = hs.timer.new(mins*60, function() timerEnded(timerInfo) end)
---   table.insert(ES_Timers, timerInfo)
---   table.sort(ES_Timers, function(a,b) return a.endTime < b.endTime end)
---   timerInfo.timer:start()
--- end
-
-
 -- # Menu Handling
 
 function getESMenu()
@@ -225,8 +113,6 @@ function getESMenu()
   local minipad, pad = addMenuHeader(_menu)
   addScreenResolutionOptions(_menu, pad)
   addModeOptions(_menu, minipad, pad)
-  -- addTimerOptions(_menu, minipad, pad)
-  -- addActiveTimers(_menu, minipad)
   addBrightnessControls(_menu, pad)
 
   ES_UsePopupMenu = false
@@ -255,36 +141,55 @@ end
 
 
 function addScreenResolutionOptions(_menu, pad)
+  -- table.insert(_menu, { title = "-" })
+  
+  local i = 1
   local screens = hs.screen.allScreens()
   table.sort(screens, function(a,b) return a:name() < b:name() end)
-
-  resetResolutionShortcuts()
-
-  for _, screen in ipairs(screens) do
-    local resolutions = getScreenResolutions(screen)
-    assignResolutionShortcuts(screen, resolutions)
-    local subMenu = getScreenResolutionSubmenu(screen, resolutions)
-    table.insert(_menu, { title = pad..asTitleCase(screen:name()), menu=subMenu })
+  
+  for _, s in pairs(screens) do
+    local subMenu, menuItems, i = getScreenResolutionSubmenu(s, i)
+    table.insert(_menu, { title = pad..asTitleCase(s:name()), menu=subMenu })
+    for m = 1, #menuItems do
+      table.insert(_menu, menuItems[m])
+    end
+    -- i = i + #subMenu
   end
-
-  updateResolutionHotkeys()
+  
   table.insert(_menu, { title = "-" })
 end
 
 
-function getScreenResolutionSubmenu(screen, resolutions)
+function getScreenResolutionSubmenu(screen, i)
   local currentMode = screen:currentMode()
+  local modeDict = screen:availableModes()
   local subMenu = {}
+  local modes, resolutions = {}, {}
+  local menuItems = {}
 
-  for _, r in ipairs(resolutions) do
-    table.insert(subMenu, {
-      title = r.title,
-      shortcut = r.shortcut or "",
+  modes = getUniqueSortedModes(modeDict)
+  resolutions = getFilteredResolutions(modes)
+
+  for d,r in pairs(resolutions) do
+    local shortcut = "" 
+    -- put double res on top menu also, indented
+    if i <= 9 and r.scale == 2.0 then
+      shortcut = ""..i
+      table.insert(menuItems, {
+        title = "      "..r.title, 
+        shortcut=shortcut, 
+        checked=(currentMode.w == r.w and currentMode.h == r.h),
+        fn=function(mode,item) setResolution(screen:getUUID(), r.w, r.h, r.scale, r.freq, r.depth) end })
+      i = i+1
+    end
+    -- put all on submenu
+    table.insert(subMenu, { 
+      title = r.title, 
       checked=(currentMode.w == r.w and currentMode.h == r.h),
       fn=function(mode,item) setResolution(screen:getUUID(), r.w, r.h, r.scale, r.freq, r.depth) end })
-  end
+    end
 
-  return subMenu
+  return subMenu, menuItems, 1
 end
 
 function getUniqueSortedModes(modeDict)
@@ -301,7 +206,7 @@ end
 function getFilteredResolutions(modes)
   local resolutions = {}
   for _,r in pairs(modes) do
-    if r.scale ~= 1.0 or not any(modes, function(a)
+    if r.scale ~= 1.0 or not any(modes, function(a) 
         return a.w == r.w and a.h == r.h and a.scale == 2.0
       end) then
       r.title = formatResolutionTitle(r)
@@ -312,98 +217,6 @@ function getFilteredResolutions(modes)
     return a.w > b.w or (a.w == b.w and a.h > b.h)
   end)
   return resolutions
-end
-
-function getScreenResolutions(screen)
-  local modeDict = screen:availableModes()
-  local modes = getUniqueSortedModes(modeDict)
-  return getFilteredResolutions(modes)
-end
-
-function resetResolutionShortcuts()
-  ES_ResolutionShortcuts = {}
-end
-
-function assignResolutionShortcuts(screen, resolutions)
-  local uuid = screen:getUUID()
-  ES_ResolutionShortcuts[uuid] = {}
-  local count = math.min(#ES_ResolutionShortcutKeys, #resolutions)
-  for offset = 0, count - 1 do
-    local index = #resolutions - offset
-    local shortcut = ES_ResolutionShortcutKeys[offset + 1]
-    local resolution = resolutions[index]
-    resolution.shortcut = shortcut
-    ES_ResolutionShortcuts[uuid][shortcut] = {
-      w = resolution.w,
-      h = resolution.h,
-      scale = resolution.scale,
-      freq = resolution.freq,
-      depth = resolution.depth,
-      title = resolution.title,
-    }
-  end
-end
-
-function getResolutionHotkeyHelp(key)
-  local screen = hs.screen.mainScreen()
-  if not screen then
-    return "Set screen resolution"
-  end
-  local uuid = screen:getUUID()
-  local shortcuts = ES_ResolutionShortcuts[uuid]
-  local resolution = shortcuts and shortcuts[key]
-  if resolution then
-    local label = resolution.w.." x "..resolution.h
-    if resolution.scale == 2.0 then
-      label = ES_State.." "..label
-    end
-    return "Set "..screen:name().." to "..label
-  end
-  return "Set screen resolution"
-end
-
-function applyResolutionShortcut(key)
-  local screen = hs.screen.mainScreen()
-  if not screen then return end
-  local uuid = screen:getUUID()
-  local shortcuts = ES_ResolutionShortcuts[uuid]
-  local resolution = shortcuts and shortcuts[key]
-  if resolution then
-    setResolution(uuid, resolution.w, resolution.h, resolution.scale, resolution.freq, resolution.depth)
-  end
-end
-
-function hasResolutionShortcut(key)
-  for _, shortcuts in pairs(ES_ResolutionShortcuts) do
-    if shortcuts[key] then
-      return true
-    end
-  end
-  return false
-end
-
-function updateResolutionHotkeys()
-  for key, hotkey in pairs(ES_ResolutionHotkeys) do
-    unbindKey(hotkey)
-    ES_ResolutionHotkeys[key] = nil
-  end
-
-  for _, key in ipairs(ES_ResolutionShortcutKeys) do
-    if hasResolutionShortcut(key) then
-      ES_ResolutionHotkeys[key] = bindKey("", key, getResolutionHotkeyHelp(key), function() applyResolutionShortcut(key) end)
-    end
-  end
-end
-
-function refreshResolutionShortcuts()
-  resetResolutionShortcuts()
-  local screens = hs.screen.allScreens()
-  table.sort(screens, function(a,b) return a:name() < b:name() end)
-  for _, screen in ipairs(screens) do
-    local resolutions = getScreenResolutions(screen)
-    assignResolutionShortcuts(screen, resolutions)
-  end
-  updateResolutionHotkeys()
 end
 
 function formatResolutionTitle(resolution)
@@ -437,49 +250,9 @@ function addModeOptions(_menu, minipad, pad)
   table.insert(_menu, { title = "-" })  
 end
 
--- function addTimerOptions(_menu, minipad, pad)
---   local timerMenu = createTimerMenu(minipad)
---   local prompt = (#ES_Timers > 0 and "Timers:" or "Add Timer")
---   table.insert(_menu, { title = pad..prompt, shortcut="a", menu=timerMenu })
--- end
-
--- function createTimerMenu(pad)
---   local timerMenu = {}
---   local insertTimerMenu = function(mins, shortcut)
---     table.insert(timerMenu, { 
---       title    = ES_TimerIcons[mins][ES_OnIcon]..pad..mins.." Minute"..(mins > 1 and "s" or ""),
---       shortcut = shortcut,
---       fn       = function(_,_) addTimer(mins) end })
---     end
-
---   for t = 1,9 do insertTimerMenu(t, t.."") end
---   insertTimerMenu(10, "0") 
---   for t = 15,50,5 do insertTimerMenu(t, "") end
-
---   return timerMenu
--- end
-
--- function addActiveTimers(_menu, minipad)
---   if #ES_Timers > 0 then
---     table.insert(_menu, { title = "-" })
---     for t,v in pairs(ES_Timers) do
---       local title, disabled = "", true
---       if v.isEnded then
---         title = "􁙆"..minipad.."  "..v.mins.." minute timer finished at "..os.date(ES_TimeFormat,v.endTime)
---       else
---         title = "􀐱"..minipad.." "..os.date(ES_TimeFormat,v.endTime).." - "..v.mins.." minute timer started "..os.date(ES_TimeFormat,v.startTime)
---         disabled = false
---       end
---       table.insert(_menu, { title = title, fn=function(_,_) showTimer(v) end, disabled=disabled })
---     end
---   end
--- end
-
 function addBrightnessControls(_menu, pad)
   table.insert(_menu, { title = pad.."Pop Brightness", shortcut="p", fn=popBrightness })
   table.insert(_menu, { title = pad.."Min Brightness", shortcut="m", fn=minBrightness })
-  -- table.insert(_menu, { title = pad.."Decrease Brightness", shortcut="-", fn=decreaseBrightness })
-  -- table.insert(_menu, { title = pad.."Increase Brightness", shortcut="=", fn=increaseBrightness })
   table.insert(_menu, { title = "-" })
   table.insert(_menu, { title = pad.."Settings", shortcut=",", fn=openDisplayPrefs })
 
@@ -506,8 +279,6 @@ if ES_Menu then
     :setTitle(ES_State)
     :setMenu(getESMenu)
 end
-
-refreshResolutionShortcuts()
 
 bindKey("", "F1", "Screen Sleep", showESMenu)
 
