@@ -550,14 +550,64 @@ test("split", {
   emptyString   = { args={"", ";"},       expected={} },
 })
 
-
 keys = {}
+hotkeyCollisions = {}
 showingKeyHelp = false
+
+local function normalizeMods(mods)
+  if type(mods) == "table" then
+    local copy = {}
+    for i = 1, #mods do
+      copy[i] = mods[i]
+    end
+    table.sort(copy)
+    return copy
+  elseif type(mods) == "string" then
+    if mods == "" then
+      return {}
+    end
+    return { mods }
+  elseif mods ~= nil then
+    return { tostring(mods) }
+  else
+    return {}
+  end
+end
+
+local function makeHotkeyId(mods, key)
+  local normalizedMods = normalizeMods(mods)
+  local normalizedKey = type(key) == "string" and string.lower(key) or tostring(get(key, ""))
+  if #normalizedMods == 0 then
+    return normalizedKey
+  end
+  return table.concat(normalizedMods, "+") .. "+" .. normalizedKey
+end
+
+local function describeHotkey(mods, key)
+  local normalizedMods = normalizeMods(mods)
+  local keyLabel = type(key) == "string" and string.upper(key) or tostring(get(key, ""))
+  if #normalizedMods == 0 then
+    return keyLabel
+  end
+  return (table.concat(normalizedMods, "+")) .. "+" .. keyLabel
+end
 
 function bindKey(_mods, _key, _help, _fnDown, _fnUp, _fnRepeat)
   -- show('Binding key "'.._key..'"',10)
   local _hotkey = hs.hotkey.bind(_mods, _key, _fnDown, _fnUp, _fnRepeat)
-  table.insert(keys, {mods=_mods, key=_key, help=_help, hotkey=_hotkey})
+  local hotkeyId = makeHotkeyId(_mods, _key)
+  local collision = hs.fnutils.find(keys, function(k) return k.hotkeyId == hotkeyId end)
+  if collision then
+    local message = "Hotkey collision: " .. describeHotkey(_mods, _key) .. " (" .. get(collision.help, "existing binding") .. " vs " .. get(_help, "new binding") .. ")"
+    table.insert(hotkeyCollisions, {
+      id = hotkeyId,
+      existing = get(collision.help, ""),
+      incoming = get(_help, "")
+    })
+    print(message)
+    if Debug then show(message, 4) end
+  end
+  table.insert(keys, {mods=_mods, key=_key, help=_help, hotkey=_hotkey, hotkeyId=hotkeyId})
   return _hotkey
 end  
 
@@ -566,6 +616,10 @@ function unbindKey(_hotkey)
     _hotkey:delete()
     keys = hs.fnutils.filter(keys, function(k) return k.hotkey ~= _hotkey end)
   end
+end
+
+function getHotkeyCollisions()
+  return hotkeyCollisions
 end
 
 
