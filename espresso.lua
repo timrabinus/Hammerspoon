@@ -13,6 +13,9 @@ ES_Brightness = hs.screen.primaryScreen(): getBrightness() or 0.5
 ES_TimeFormat = "%I:%M:%S %p"
 
 ES_UsePopupMenu = false
+ES_ResolutionShortcutKeys = {"9", "8", "7", "6", "5", "4", "3", "2", "1"}
+ES_ResolutionShortcuts = {}
+ES_ResolutionHotkeys = {}
 
 -- ES_OnIcon    = 1
 -- ES_OffIcon   = 2
@@ -252,39 +255,31 @@ end
 
 
 function addScreenResolutionOptions(_menu, pad)
-  -- table.insert(_menu, { title = "-" })
-  
-  local i = 1
   local screens = hs.screen.allScreens()
   table.sort(screens, function(a,b) return a:name() < b:name() end)
-  
-  for _, s in pairs(screens) do
-    local subMenu = getScreenResolutionSubmenu(s, i)
-    table.insert(_menu, { title = pad..asTitleCase(s:name()), menu=subMenu })
-    i = i + #subMenu
+
+  resetResolutionShortcuts()
+
+  for _, screen in ipairs(screens) do
+    local resolutions = getScreenResolutions(screen)
+    assignResolutionShortcuts(screen, resolutions)
+    local subMenu = getScreenResolutionSubmenu(screen, resolutions)
+    table.insert(_menu, { title = pad..asTitleCase(screen:name()), menu=subMenu })
   end
-  
+
+  updateResolutionHotkeys()
   table.insert(_menu, { title = "-" })
 end
 
 
-function getScreenResolutionSubmenu(screen, i)
+function getScreenResolutionSubmenu(screen, resolutions)
   local currentMode = screen:currentMode()
-  local modeDict = screen:availableModes()
   local subMenu = {}
-  local modes, resolutions = {}, {}
 
-  modes = getUniqueSortedModes(modeDict)
-  resolutions = getFilteredResolutions(modes)
-
-  for d,r in pairs(resolutions) do
-    local shortcut = "" 
-    if i <= 9 and r.scale == 2.0 then
-      shortcut = ""..i
-      i = i+1
-    end
-    table.insert(subMenu, { 
-      title = r.title, 
+  for _, r in ipairs(resolutions) do
+    table.insert(subMenu, {
+      title = r.title,
+      shortcut = r.shortcut or "",
       checked=(currentMode.w == r.w and currentMode.h == r.h),
       fn=function(mode,item) setResolution(screen:getUUID(), r.w, r.h, r.scale, r.freq, r.depth) end })
   end
@@ -306,7 +301,7 @@ end
 function getFilteredResolutions(modes)
   local resolutions = {}
   for _,r in pairs(modes) do
-    if r.scale ~= 1.0 or not any(modes, function(a) 
+    if r.scale ~= 1.0 or not any(modes, function(a)
         return a.w == r.w and a.h == r.h and a.scale == 2.0
       end) then
       r.title = formatResolutionTitle(r)
@@ -317,6 +312,98 @@ function getFilteredResolutions(modes)
     return a.w > b.w or (a.w == b.w and a.h > b.h)
   end)
   return resolutions
+end
+
+function getScreenResolutions(screen)
+  local modeDict = screen:availableModes()
+  local modes = getUniqueSortedModes(modeDict)
+  return getFilteredResolutions(modes)
+end
+
+function resetResolutionShortcuts()
+  ES_ResolutionShortcuts = {}
+end
+
+function assignResolutionShortcuts(screen, resolutions)
+  local uuid = screen:getUUID()
+  ES_ResolutionShortcuts[uuid] = {}
+  local count = math.min(#ES_ResolutionShortcutKeys, #resolutions)
+  for offset = 0, count - 1 do
+    local index = #resolutions - offset
+    local shortcut = ES_ResolutionShortcutKeys[offset + 1]
+    local resolution = resolutions[index]
+    resolution.shortcut = shortcut
+    ES_ResolutionShortcuts[uuid][shortcut] = {
+      w = resolution.w,
+      h = resolution.h,
+      scale = resolution.scale,
+      freq = resolution.freq,
+      depth = resolution.depth,
+      title = resolution.title,
+    }
+  end
+end
+
+function getResolutionHotkeyHelp(key)
+  local screen = hs.screen.mainScreen()
+  if not screen then
+    return "Set screen resolution"
+  end
+  local uuid = screen:getUUID()
+  local shortcuts = ES_ResolutionShortcuts[uuid]
+  local resolution = shortcuts and shortcuts[key]
+  if resolution then
+    local label = resolution.w.." x "..resolution.h
+    if resolution.scale == 2.0 then
+      label = ES_State.." "..label
+    end
+    return "Set "..screen:name().." to "..label
+  end
+  return "Set screen resolution"
+end
+
+function applyResolutionShortcut(key)
+  local screen = hs.screen.mainScreen()
+  if not screen then return end
+  local uuid = screen:getUUID()
+  local shortcuts = ES_ResolutionShortcuts[uuid]
+  local resolution = shortcuts and shortcuts[key]
+  if resolution then
+    setResolution(uuid, resolution.w, resolution.h, resolution.scale, resolution.freq, resolution.depth)
+  end
+end
+
+function hasResolutionShortcut(key)
+  for _, shortcuts in pairs(ES_ResolutionShortcuts) do
+    if shortcuts[key] then
+      return true
+    end
+  end
+  return false
+end
+
+function updateResolutionHotkeys()
+  for key, hotkey in pairs(ES_ResolutionHotkeys) do
+    unbindKey(hotkey)
+    ES_ResolutionHotkeys[key] = nil
+  end
+
+  for _, key in ipairs(ES_ResolutionShortcutKeys) do
+    if hasResolutionShortcut(key) then
+      ES_ResolutionHotkeys[key] = bindKey("", key, getResolutionHotkeyHelp(key), function() applyResolutionShortcut(key) end)
+    end
+  end
+end
+
+function refreshResolutionShortcuts()
+  resetResolutionShortcuts()
+  local screens = hs.screen.allScreens()
+  table.sort(screens, function(a,b) return a:name() < b:name() end)
+  for _, screen in ipairs(screens) do
+    local resolutions = getScreenResolutions(screen)
+    assignResolutionShortcuts(screen, resolutions)
+  end
+  updateResolutionHotkeys()
 end
 
 function formatResolutionTitle(resolution)
@@ -419,6 +506,8 @@ if ES_Menu then
     :setTitle(ES_State)
     :setMenu(getESMenu)
 end
+
+refreshResolutionShortcuts()
 
 bindKey("", "F1", "Screen Sleep", showESMenu)
 
