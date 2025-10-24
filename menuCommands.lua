@@ -16,16 +16,91 @@ MCMatchingMenuItems = {}
 MCChoices = {}
 MCChooser = nil
 MCAppWatcher = nil
+MCBaseMenuItems = {}
+MCWindowMenuLookup = {}
 
 
-function refreshCommandHUD(str) 
+local function filterMenuItems(menuItems)
+  local filtered = {}
+
+  for _, item in ipairs(menuItems or {}) do
+    if item.AXTitle ~= "Help" then
+      table.insert(filtered, item)
+    end
+  end
+
+  return filtered
+end
+
+
+local function buildWindowsMenu()
+  MCWindowMenuLookup = {}
+
+  local app = hs.application.frontmostApplication()
+  if not app then return nil end
+
+  local windows = app:orderedWindows()
+  local windowItems = {}
+  local index = 1
+
+  for _, window in ipairs(windows) do
+    local title = window:title()
+    if window:isStandard() and title ~= nil and title ~= "" then
+      local shortcut = tostring(index)
+      local entryTitle = string.format("%s. %s", shortcut, title)
+
+      table.insert(windowItems, {
+        AXTitle = entryTitle,
+        AXEnabled = true,
+        AXMenuItemCmdChar = shortcut,
+        AXMenuItemCmdModifiers = {},
+      })
+
+      MCWindowMenuLookup["Windows > " .. entryTitle] = window
+      index = index + 1
+    end
+  end
+
+  if #windowItems == 0 then
+    return nil
+  end
+
+  return {
+    AXTitle = "Windows",
+    AXChildren = { windowItems },
+  }
+end
+
+
+local function rebuildMenuItems()
+  local menu = {}
+
+  for _, item in ipairs(MCBaseMenuItems or {}) do
+    table.insert(menu, item)
+  end
+
+  local windowMenu = buildWindowsMenu()
+
+  if windowMenu ~= nil then
+    table.insert(menu, { AXTitle = "" })
+    table.insert(menu, windowMenu)
+  end
+
+  MCMenuItems = menu
+end
+
+
+function refreshCommandHUD(str)
   MCChoices = {}
-  if #str > 1 then
+  rebuildMenuItems()
+
+  local shouldSearch = (#str > 1) or str:match("^%d$")
+  if shouldSearch then
     local items = findMatchingMenuItems(str, MCMenuItems)
     MCMatchingMenuItems = toSet(items)
     run(
-      MCMatchingMenuItems, 
-      function(_,v) 
+      MCMatchingMenuItems,
+      function(_,v)
         local choice = {}
         choice.text = v
         table.insert(MCChoices, choice)
@@ -51,7 +126,12 @@ end
 function commandHUDSelection(chosen)
   if chosen and chosen.text then
     print(chosen.text)
-    hs.application.frontmostApplication():selectMenuItem(chosen.text  )
+    local window = MCWindowMenuLookup[chosen.text]
+    if window then
+      window:focus()
+    else
+      hs.application.frontmostApplication():selectMenuItem(chosen.text)
+    end
   end
   MCChooser:delete()
 end
@@ -119,24 +199,29 @@ function ShowMCMenu()
   if #MCMenuItems == 0 then
     hs.application.frontmostApplication():getMenuItems(onGotMCItemsLaunch)
   else
+    rebuildMenuItems()
     showCommandHUD()
   end
 end
 
 
 function onGotMCItemsLaunch(items)
-  MCMenuItems = items
+  MCBaseMenuItems = filterMenuItems(items)
+  rebuildMenuItems()
   showCommandHUD()
 end
 
 function onGotMCItems(items)
-  MCMenuItems = items
+  MCBaseMenuItems = filterMenuItems(items)
+  rebuildMenuItems()
 end
 
 
 function onMCAppSwitch(appName, event, app)
   if event == hs.application.watcher.activated then
     MCMenuItems = {}
+    MCBaseMenuItems = {}
+    MCWindowMenuLookup = {}
     hs.application.frontmostApplication():getMenuItems(onGotMCItems)
   end
 end
