@@ -60,7 +60,7 @@ function buildWindowMenuItems()
     local title = window:title()
     if window:isStandard() and title ~= nil and title ~= "" then
       table.insert(windowItems, {
-          title="        "..index..":  "..title,
+          title="     􃑷  "..title,
           fn=function(cmd,item) print(title) end,
           shortcut=""..index})
       index = index + 1
