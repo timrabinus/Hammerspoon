@@ -44,13 +44,7 @@ function buildWindowMenuItems()
   if not app then return nil end
 
   local windows = app:allWindows()
-  local minimizedWindows = select(hs.window.minimizedWindows(), 
-    function(win) return app == win:application() end)
-  windows = addAll(windows, minimizedWindows)
   table.sort(windows, function(a,b) return a:title() < b:title() end)
-
-  -- windows = app.allWindows() + hs.window.minimizedWindows().select { w | w:application() == app }
-  -- windows = windows.sort { a, b | a.title() < b.title() }
 
   local windowItems = {}
   local index = 1
@@ -58,10 +52,10 @@ function buildWindowMenuItems()
   for _, window in ipairs(windows) do
     print(window)
     local title = window:title()
-    if window:isStandard() and title ~= nil and title ~= "" then
+    if title ~= nil and title ~= "" then
       table.insert(windowItems, {
           title="     􃑷  "..title,
-          fn=function(cmd,item) print(title) end,
+          fn=function(cmd,item) bringToFront(window) end,
           shortcut=""..index})
       index = index + 1
     end
@@ -69,6 +63,13 @@ function buildWindowMenuItems()
   return windowItems
 end
 
+
+function bringToFront(window)
+  if window then
+    window:unminimize()
+    window:focus()
+  end
+end
 
 
 -- [] Fix duplicate "Save As…" (same key) and "Close Window" (diff keys)
@@ -188,31 +189,57 @@ end
 -- Using hs.inspect() on these tables, while useful for exploration, can be extremely slow, 
 -- taking several minutes to correctly render very complex menus
 
-function getMenuKeysMenu(menu, isAppMenu)
+function getMenuKeysMenu(menu, isAppMenu, parentTitle)
   local popupMenu = {}
   local lastItemWasSeparator = false
   local keys = {}
   local commonShortcuts = {}
   local lastTitle
-  local cpad = ""
+  local cpad = "    "
   local appendWindows = false
-  -- pad = pad or 0
+  local windowTitles = {}
+  local windowShortcut = 1
 
-  -- start by finding & assigning common menu items, like Save, Print
-  -- initialise keys with any common shortcuts
   if menu == nil then return end
 
+  -- Insert parent title at top and recognise window titles if in Window menu
+  if parentTitle ~= nil then
+    newTitle = MK_Icon.." "..parentTitle
+    table.insert(popupMenu, { title=MK_Icon.." "..parentTitle, disabled=true })
+    table.insert(popupMenu, { title = "-" })    
+
+    if parentTitle == 'Window' then
+      -- get the last group of titles, so that we can order by name (?) and put numbers as shortcuts
+      for m = #menu,1,-1 do
+        local item = menu[m]
+        local title = item.AXTitle
+        if title == "" then
+          break
+        else
+          table.insert(windowTitles, title)
+        end
+      end
+      dump(windowTitles, "Window titles")
+    end
+  end
+
+  -- initialise keys with any common shortcuts, eg for Save etc
   for m = 1,#menu do
     local item = menu[m]
     local title = item.AXTitle
-    -- if item.AXEnabled then
-    keys, key, newTitle = getCommonShortcut(keys, title)
-    if key ~= nil and key ~= "" then
-      commonShortcuts[title] = {key=key, newTitle=newTitle}
+    if parentTitle == 'Window' and contains(windowTitles, title) then
+      key = tostring(windowShortcut)
+      commonShortcuts[title] = {key=key, newTitle=(" "..title)}
+      windowShortcut = windowShortcut + 1
+    else
+      keys, key, newTitle = getCommonShortcut(keys, title)
+      if key ~= nil and key ~= "" then
+        commonShortcuts[title] = {key=key, newTitle=newTitle}
+      end
     end
-    -- end
   end
   -- dump(commonShortcuts)
+
 
   -- now assign keys for each menu item
   for m = 1,#menu do
@@ -238,25 +265,20 @@ function getMenuKeysMenu(menu, isAppMenu)
       -- if this item was a common shortcut, use that; else assign a new shortcut
       local shortcut = commonShortcuts[title]
       if shortcut ~= nil then
-        -- print("Found common shortcut "..shortcut.newTitle)
         key = shortcut.key
         newTitle = shortcut.newTitle
       else -- if item.AXEnabled then
         keys, key, newTitle = getShortcut(keys, title)
-      -- else
-      --   newTitle = " "..title
       end
 
       if children then
-        -- handle app menu 
-        -- local isAppMenu = (pad == 0 and m == 1)
+
         if isAppMenu and m == 1 then
           newTitle = MK_Icon.." "..hs.application.frontmostApplication():name()
           -- use " " as shortcut and make prior shortcut key available for other menuitems
           removeElement(keys, key)
           key=" "
         else
-          -- newTitle = cpad..newTitle
           newTitle = hs.styledtext.new(cpad)..newTitle
         end
 
@@ -279,12 +301,13 @@ function getMenuKeysMenu(menu, isAppMenu)
         if isAppMenu and m == 1 then
           table.insert(popupMenu, { title = "-" })
           -- pad = pad+1
-          cpad = "    "
+          -- cpad = "    "
         end
         -- print(title.."  "..key.." > ")
 
       elseif newTitle ~= nil and newTitle ~= lastTitle then
         lastTitle = newTitle
+        newTitle = hs.styledtext.new(cpad)..newTitle
 
         table.insert(popupMenu, {
           title = newTitle,
@@ -323,7 +346,7 @@ end
 
 
 function onParentMenuSelect(title, children, cmds, item)
-  showPopupMenu(children, false)
+  showPopupMenu(children, false, title)
 end
 
 
@@ -332,8 +355,8 @@ function containsPoint(frame, point)
      and point.y >= frame.y and point.y <= frame.y + frame.h
 end
 
-function showPopupMenu(menuItems, isAppMenu)
-  local menuTable = getMenuKeysMenu(menuItems, isAppMenu)
+function showPopupMenu(menuItems, isAppMenu, parentTitle)
+  local menuTable = getMenuKeysMenu(menuItems, isAppMenu, parentTitle)
   local hsMenu = hs.menubar.new():setMenu(menuTable)
   local app = hs.application.frontmostApplication()
   local win = app:focusedWindow()
