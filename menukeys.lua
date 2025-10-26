@@ -361,12 +361,12 @@ function showPopupMenu(menuItems, isAppMenu, parentTitle)
   local app = hs.application.frontmostApplication()
   local win = app:focusedWindow()
   if isEmpty(MK_MenuLoc) then
-    -- if win and not containsPoint(win:frame(), hs.mouse.absolutePosition()) then
+    if win and not containsPoint(win:frame(), hs.mouse.absolutePosition()) then
       local rect = win:title() == "" and hs.screen.mainScreen():frame() or win:frame()
       MK_MenuLoc = {x=rect.x+rect.w/2-60,y=rect.y+rect.h/4}
-    -- else
-    --   MK_MenuLoc= hs.mouse.absolutePosition()
-    -- end
+    else
+      MK_MenuLoc= hs.mouse.absolutePosition()
+    end
   end
   hsMenu:popupMenu(MK_MenuLoc)
 end
