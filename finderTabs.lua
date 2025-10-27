@@ -95,7 +95,7 @@ function _InitializeTabs()
   FT_MainScreenFrame = hs.screen.mainScreen():frame()
 
   local displayHeight = FT_MainScreenFrame.h + FT_TitlebarHeight
-  local dropboxHome = FT_HasExternalDrive and "/Volumes/TranscendHD/Users/martin/Dropbox/" or "/Users/Martin/Dropbox/"
+  local dropboxHome = FT_HasExternalDrive and "/Volumes/TranscendHD/Users/" .. os.getenv("USER") .. "/Dropbox/" or "/Users/" .. os.getenv("USER") .. "/Dropbox/"
   local tabs = {
     {
       title            = "Applications",
@@ -108,7 +108,7 @@ function _InitializeTabs()
     {
       title            = "Downloads",
       winFrame         = { h = displayHeight, w = 532.0, x = 325.0, y = 0.0 },
-      path             = "/Users/Martin/Downloads",
+      path             = "/Users/" .. os.getenv("USER") .. "/Downloads",
       sidebarIsVisible = false,
       toolbarIsVisible = false,
       wideScreenOnly   = false,
