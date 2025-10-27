@@ -1,4 +1,4 @@
-#About
+# About
 
 Semi disorganised collection of Hammerspoon utilities.  Not written as spoons.
 
