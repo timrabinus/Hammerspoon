@@ -2,7 +2,7 @@
 
 Semi disorganised collection of Hammerspoon utilities.  Not written as spoons.
 
-#Featured
+# Featured
 
 Here are the ones that I use the most:
 
@@ -19,7 +19,7 @@ Others that are useful but get less air time:
 * userProfiler - keeps a log of the current window
 * winDebug - shows information about Mac windows
 
-#Using These
+# Using These
 
 A few points about using these:
 * they rely on the SF Fonts being loaded to give the various icons
