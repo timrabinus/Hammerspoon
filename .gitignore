@@ -1,4 +1,8 @@
-/_hammerspoon
-/.vscode
-/MSpoons
-/Archive
+_hammerspoon/
+_hammerspoon/*
+.vscode/
+.vscode/*
+MSpoons/
+MSpoons/*
+Archive/
+Archive/*
