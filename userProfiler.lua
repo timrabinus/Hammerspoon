@@ -3,7 +3,7 @@ require "hs.fnutils"
 UP_ProfilingOffTitle = "􀟀" -- ruler
 UP_ProfilingOnTitle = "􀟁" -- ruler.fill
 UP_Title = UP_ProfilingOffTitle
-UP_FileRoot = "/Users/martin/UserProfiles/"
+UP_FileRoot = "~/UserProfiles/"
 UP_File = nil
 UP_FilePath = nil
 UP_Menu = hs.menubar.new()
