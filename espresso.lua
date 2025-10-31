@@ -148,34 +148,35 @@ function addScreenResolutionOptions(_menu, pad)
   table.sort(screens, function(a,b) return a:name() < b:name() end)
   
   for _, s in pairs(screens) do
-    local subMenu, menuItems, i = getScreenResolutionSubmenu(s, i)
+    local subMenu, topMenuItems = getScreenResolutionMenuItems(s, i)
+    i = i + #topMenuItems
     table.insert(_menu, { title = pad..asTitleCase(s:name()), menu=subMenu })
-    for m = 1, #menuItems do
-      table.insert(_menu, menuItems[m])
+    for m = 1, #topMenuItems do
+      table.insert(_menu, topMenuItems[m])
     end
-    -- i = i + #subMenu
+    table.insert(_menu, { title = "-" })
   end
-  
-  table.insert(_menu, { title = "-" })
+
 end
 
 
-function getScreenResolutionSubmenu(screen, i)
+function getScreenResolutionMenuItems(screen, i)
   local currentMode = screen:currentMode()
   local modeDict = screen:availableModes()
   local subMenu = {}
   local modes, resolutions = {}, {}
-  local menuItems = {}
+  local topMenuItems = {}
 
-  modes = getUniqueSortedModes(modeDict)
-  resolutions = getFilteredResolutions(modes)
+  modes = getFilteredResolutions(modeDict)
+  modes = getUniqueResolutions(modes)
+  resolutions = sortByResolution(modes)
 
   for d,r in pairs(resolutions) do
     local shortcut = "" 
     -- put double res on top menu also, indented
     if i <= 9 and r.scale == 2.0 then
       shortcut = ""..i
-      table.insert(menuItems, {
+      table.insert(topMenuItems, {
         title = "      "..r.title, 
         shortcut=shortcut, 
         checked=(currentMode.w == r.w and currentMode.h == r.h),
@@ -189,10 +190,10 @@ function getScreenResolutionSubmenu(screen, i)
       fn=function(mode,item) setResolution(screen:getUUID(), r.w, r.h, r.scale, r.freq, r.depth) end })
     end
 
-  return subMenu, menuItems, 1
+  return subMenu, topMenuItems
 end
 
-function getUniqueSortedModes(modeDict)
+function getUniqueResolutions(modeDict)
   local modes = {}
   for _,m in pairs(modeDict) do
     if m.w >= 1023 and m.h >= 900 
@@ -213,6 +214,13 @@ function getFilteredResolutions(modes)
       table.insert(resolutions,r)
     end
   end
+  -- table.sort(resolutions, function(a,b)
+  --   return a.w > b.w or (a.w == b.w and a.h > b.h)
+  -- end)
+  return resolutions
+end
+
+function sortByResolution(resolutions)
   table.sort(resolutions, function(a,b)
     return a.w > b.w or (a.w == b.w and a.h > b.h)
   end)
